@@ -31,11 +31,22 @@ def conv2d(input_, output_dim, ks=4, s=2, stddev=0.02, padding='SAME', name="con
                            biases_initializer=None)
 
 
-def deconv2d(input_, output_dim, ks=4, s=2, stddev=0.02, name="deconv2d"):
+def deconv2d(input_, output_dim, ks=4, s=2, stddev=0.02, name="deconv2d", use_upsampling=False):
+    # From: https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix/blob/master/docs/qa.md 
     with tf.variable_scope(name):
-        return slim.conv2d_transpose(input_, output_dim, ks, s, padding='SAME', activation_fn=None,
+        if use_upsampling:
+            batch, in_height, in_width, in_channels = [int(d) for d in input_.get_shape()]
+            x = tf.image.resize_nearest_neighbor(x, (2*in_height,2*in_width))
+            x = tf.pad(x, [[0, 0], [1, 1], [1, 1], [0, 0]], "REFLECT")
+            x = slim.conv2d(input_, output_dim, ks, 1, padding="VALID", activation_fn=None,
+                           weights_initializer=tf.truncated_normal_initializer(stddev=stddev),
+                           biases_initializer=None)
+            return x
+        else:
+            return slim.conv2d_transpose(input_, output_dim, ks, s, padding='SAME', activation_fn=None,
                                      weights_initializer=tf.truncated_normal_initializer(stddev=stddev),
                                      biases_initializer=None)
+        
 
 def dilated_conv2d(input_, output_dim, ks=3, s=2, stddev=0.02, padding='SAME', name="conv2d"):
     with tf.variable_scope(name):

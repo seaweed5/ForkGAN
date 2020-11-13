@@ -35,24 +35,45 @@ def load_test_data(image_path, fine_size=256):
 def check_folder(path):
     if not os.path.exists(path):
         os.mkdir(path)
+        
+def scale_shorter(pil_img, size, input_nc):
+    w, h = pil_img.size
+    s = size/h
+    h = size
+    w = int(s * w)
+    img = np.array(pil_img.resize((w, h)))
+    img = img.reshape(h, w, input_nc)
+    return img, w, h
 
-def load_train_data(image_path, load_size=286, fine_size=256, is_testing=False):
-    img_A = imread(image_path[0])
-    img_B = imread(image_path[1])
+def load_train_data(image_path, load_size=286, fine_size_w=256, fine_size_h=256, input_nc=3, is_testing=False):
+    img_A = Image.open(image_path[0]).convert('RGB')
+    img_B = Image.open(image_path[1]).convert('RGB')
+    if input_nc == 1:
+        img_A = img_A.convert('L')
+        img_B = img_B.convert('L')
+
     if not is_testing:
-        img_A = scipy.misc.imresize(img_A, [load_size, load_size*2])
-        img_B = scipy.misc.imresize(img_B, [load_size, load_size*2])
-        h1 = int(np.ceil(np.random.uniform(1e-2, load_size-fine_size)))
-        w1 = int(np.ceil(np.random.uniform(1e-2, (load_size-fine_size)*2)))
-        img_A = img_A[h1:h1+fine_size, w1:w1+fine_size*2]
-        img_B = img_B[h1:h1+fine_size, w1:w1+fine_size*2]
+        img_A, w_a, h_a = scale_shorter(img_A, load_size)
+        img_B, w_b, h_b = scale_shorter(img_B, load_size)
+        h_a = int(np.ceil(np.random.uniform(0, h_a-fine_size_h)))
+        w_a = int(np.ceil(np.random.uniform(0, w_a-fine_size_w)))
+        h_b = int(np.ceil(np.random.uniform(0, h_b-fine_size_h)))
+        w_b = int(np.ceil(np.random.uniform(0, w_b-fine_size_w)))
+        img_A = img_A[h_a:h_a+fine_size_h, w_a:w_a+fine_size_w]
+        img_B = img_B[h_b:h_b+fine_size_h, w_b:w_b+fine_size_w]
 
         if np.random.random() > 0.5:
             img_A = np.fliplr(img_A)
             img_B = np.fliplr(img_B)
     else:
-        img_A = scipy.misc.imresize(img_A, [fine_size, fine_size*2])
-        img_B = scipy.misc.imresize(img_B, [fine_size, fine_size*2])
+        img_A, w_a, h_a = scale_shorter(img_A, fine_size_h) # Alert! Hard-coded
+        img_B, w_b, h_b = scale_shorter(img_B, fine_size_h)
+        h_a = int(np.ceil(np.random.uniform(0, h_a-fine_size_h)))
+        w_a = int(np.ceil(np.random.uniform(0, w_a-fine_size_w)))
+        h_b = int(np.ceil(np.random.uniform(0, h_b-fine_size_h)))
+        w_b = int(np.ceil(np.random.uniform(0, w_b-fine_size_w)))
+        img_A = img_A[h_a:h_a+fine_size_h, w_a:w_a+fine_size_w]
+        img_B = img_B[h_b:h_b+fine_size_h, w_b:w_b+fine_size_w]
 
     img_A = img_A/127.5 - 1.
     img_B = img_B/127.5 - 1.

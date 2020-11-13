@@ -9,8 +9,9 @@ parser.add_argument('--epoch', dest='epoch', type=int, default=20, help='# of ep
 parser.add_argument('--epoch_step', dest='epoch_step', type=int, default=10, help='# of epoch to decay lr')
 parser.add_argument('--batch_size', dest='batch_size', type=int, default=1, help='# images in batch')
 parser.add_argument('--train_size', dest='train_size', type=int, default=1e8, help='# images used to train')
-parser.add_argument('--load_size', dest='load_size', type=int, default=286, help='scale images to this size')
-parser.add_argument('--fine_size', dest='fine_size', type=int, default=256, help='then crop to this size')
+parser.add_argument('--load_size', dest='load_size', type=int, default=286, help='scale images to this size (shorter side)')
+parser.add_argument('--fine_size_w', dest='fine_size_w', type=int, default=256, help='then crop to this width')
+parser.add_argument('--fine_size_h', dest='fine_size_h', type=int, default=256, help='then crop to this height')
 parser.add_argument('--ngf', dest='ngf', type=int, default=64, help='# of gen filters in first conv layer')
 parser.add_argument('--ndf', dest='ndf', type=int, default=64, help='# of discri filters in first conv layer')
 parser.add_argument('--n_d', dest='n_d', type=int, default=2, help='# of discriminators')
@@ -32,6 +33,8 @@ parser.add_argument('--L1_lambda', dest='L1_lambda', type=float, default=10.0, h
 parser.add_argument('--use_resnet', dest='use_resnet', type=bool, default=True,help='generation network using reidule block')
 parser.add_argument('--use_lsgan', dest='use_lsgan', type=bool, default=True, help='gan loss defined in lsgan')
 parser.add_argument('--max_size', dest='max_size', type=int, default=50,help='max size of image pool, 0 means do not use image pool')
+parser.add_argument('--use_upsampling', dest='use_upsampling', type=bool, default=False, help'use nn-upsampling+conv instead of transposed convolution')
+
 args = parser.parse_args()
 os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu)
 def main(_):

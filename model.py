@@ -7,6 +7,7 @@ def gaussian_noise_layer(input_layer, std):
     noise = tf.random_normal(shape=tf.shape(input_layer), mean=0.0, stddev=std, dtype=tf.float32)
     return input_layer+noise
 
+
 def generator_resnet(image, options, reuse=False, name="generator"):
     with tf.variable_scope(name):
         if reuse:
@@ -35,9 +36,9 @@ def generator_resnet(image, options, reuse=False, name="generator"):
         r7 = residule_block_dilated(r6, options.gf_dim * 4, name='g_r7')
         r8 = residule_block_dilated(r7, options.gf_dim * 4, name='g_r8')
         r9 = residule_block_dilated(r8, options.gf_dim * 4, name='g_r9')
-        d1 = deconv2d(r9, options.gf_dim * 2, 3, 2, name='g_d1_dc')
+        d1 = deconv2d(r9, options.gf_dim * 2, 3, 2, name='g_d1_dc', use_upsampling=options.use_upsampling)
         d1 = tf.nn.relu(instance_norm(d1, 'g_d1_bn'))
-        d2 = deconv2d(d1, options.gf_dim, 3, 2, name='g_d2_dc')
+        d2 = deconv2d(d1, options.gf_dim, 3, 2, name='g_d2_dc', use_upsampling=options.use_upsampling)
         d2 = tf.nn.relu(instance_norm(d2, 'g_d2_bn'))
         d2 = tf.pad(d2, [[0, 0], [3, 3], [3, 3], [0, 0]], "REFLECT")
         pred = tf.nn.tanh(conv2d(d2, options.output_c_dim, 7, 1, padding='VALID', name='g_pred_c'))
@@ -49,13 +50,12 @@ def generator_resnet(image, options, reuse=False, name="generator"):
         r7_rec = residule_block_dilated(r6_rec, options.gf_dim * 4, name='g_r7_rec')
         r8_rec = residule_block_dilated(r7_rec, options.gf_dim * 4, name='g_r8_rec')
         r9_rec = residule_block_dilated(r8_rec, options.gf_dim * 4, name='g_r9_rec')
-        d1_rec = deconv2d(r9_rec, options.gf_dim * 2, 3, 2, name='g_d1_dc_rec')
+        d1_rec = deconv2d(r9_rec, options.gf_dim * 2, 3, 2, name='g_d1_dc_rec', use_upsampling=options.use_upsampling)
         d1_rec = tf.nn.relu(instance_norm(d1_rec, 'g_d1_bn_rec'))
-        d2_rec = deconv2d(d1_rec, options.gf_dim, 3, 2, name='g_d2_dc_rec')
+        d2_rec = deconv2d(d1_rec, options.gf_dim, 3, 2, name='g_d2_dc_rec', use_upsampling=options.use_upsampling)
         d2_rec = tf.nn.relu(instance_norm(d2_rec, 'g_d2_bn_rec'))
         d2_rec = tf.pad(d2_rec, [[0, 0], [3, 3], [3, 3], [0, 0]], "REFLECT")
         pred_rec = tf.nn.tanh(conv2d(d2_rec, options.output_c_dim, 7, 1, padding='VALID', name='g_pred_c_rec'))
-
         return pred,pred_rec,r5
 
 def domain_agnostic_classifier(percep,options, reuse=False,name="percep"):
@@ -102,7 +102,6 @@ class cyclegan(object):
     def __init__(self, sess, args):
         self.sess = sess
         self.batch_size = args.batch_size
-        self.image_size = args.fine_size
         self.input_c_dim = args.input_nc
         self.output_c_dim = args.output_nc
         self.L1_lambda = args.L1_lambda
@@ -111,7 +110,8 @@ class cyclegan(object):
         self.n_scale = args.n_scale
         self.ndf= args.ndf
         self.load_size =args.load_size
-        self.fine_size =args.fine_size
+        self.fine_size_h = args.fine_size_h
+        self.fine_size_w = args.fine_size_w
         self.generator = generator_resnet
         self.domain_agnostic_classifier=domain_agnostic_classifier
         if args.use_lsgan:
@@ -122,16 +122,16 @@ class cyclegan(object):
             self.criterionGAN_list = sce_criterion_list
 
         OPTIONS = namedtuple('OPTIONS', 'batch_size image_size \
-                              gf_dim df_dim output_c_dim is_training')
+                              gf_dim df_dim output_c_dim is_training use_upsampling')
         self.options = OPTIONS._make((args.batch_size, args.fine_size,
                                       args.ngf, args.ndf//args.n_d, args.output_nc,
-                                      args.phase == 'train'))
+                                      args.phase == 'train', args.use_upsampling))
 
         self._build_model()
         self.saver = tf.train.Saver()
         self.pool = ImagePool(args.max_size)
 
-    def discriminator(self,image, options, reuse=False, name="discriminator"):
+    def discriminator(self, image, options, reuse=False, name="discriminator"):
         images = []
         for i in range(self.n_scale):
             images.append(tf.image.resize_bicubic(image, [get_shape(image)[1]//(2**i),get_shape(image)[2]//(2**i)]))
@@ -148,7 +148,7 @@ class cyclegan(object):
             return images
 
     def _build_model(self):
-        self.real_data = tf.placeholder(tf.float32,[self.batch_size, self.image_size, self.image_size*2,self.input_c_dim + self.output_c_dim],name='real_A_and_B_images')
+        self.real_data = tf.placeholder(tf.float32,[self.batch_size, self.fine_size_h, self.fine_size_w ,self.input_c_dim + self.output_c_dim],name='real_A_and_B_images')
 
         self.real_A = self.real_data[:, :, :, :self.input_c_dim]
         self.real_B = self.real_data[:, :, :, self.input_c_dim:self.input_c_dim + self.output_c_dim]
@@ -213,12 +213,12 @@ class cyclegan(object):
         self.g_rec_real = abs_criterion(self.rec_realA, self.real_A) + abs_criterion(self.rec_realB, self.real_B)
         self.g_rec_cycle = abs_criterion(self.real_A, self.fake_A_) + abs_criterion(self.real_B, self.fake_B_)
 
-        self.fake_A_sample = tf.placeholder(tf.float32,[self.batch_size, self.image_size, self.image_size*2,  self.output_c_dim], name='fake_A_sample')
-        self.fake_B_sample = tf.placeholder(tf.float32,[self.batch_size, self.image_size, self.image_size*2,  self.output_c_dim], name='fake_B_sample')
-        self.rec_A_sample = tf.placeholder(tf.float32,[self.batch_size, self.image_size, self.image_size * 2, self.output_c_dim],name='rec_A_sample')
-        self.rec_B_sample = tf.placeholder(tf.float32,[self.batch_size, self.image_size, self.image_size * 2, self.output_c_dim],name='rec_B_sample')
-        self.rec_fakeA_sample = tf.placeholder(tf.float32, [self.batch_size, self.image_size, self.image_size * 2,self.output_c_dim], name='rec_fakeA_sample')
-        self.rec_fakeB_sample = tf.placeholder(tf.float32, [self.batch_size, self.image_size, self.image_size * 2,self.output_c_dim], name='rec_fakeB_sample')
+        self.fake_A_sample = tf.placeholder(tf.float32,[self.batch_size, self.fine_size_h, self.self.fine_size_w, self.output_c_dim], name='fake_A_sample')
+        self.fake_B_sample = tf.placeholder(tf.float32,[self.batch_size, self.fine_size_h, self.self.fine_size_w, self.output_c_dim], name='fake_B_sample')
+        self.rec_A_sample = tf.placeholder(tf.float32,[self.batch_size, self.fine_size_h, self.self.fine_size_w, self.output_c_dim],name='rec_A_sample')
+        self.rec_B_sample = tf.placeholder(tf.float32,[self.batch_size, self.fine_size_h, self.self.fine_size_w, self.output_c_dim],name='rec_B_sample')
+        self.rec_fakeA_sample = tf.placeholder(tf.float32, [self.batch_size, self.fine_size_h, self.self.fine_size_w, self.output_c_dim], name='rec_fakeA_sample')
+        self.rec_fakeB_sample = tf.placeholder(tf.float32, [self.batch_size, self.fine_size_h, self.self.fine_size_w, self.output_c_dim], name='rec_fakeB_sample')
 
         self.d_loss_item=[]
         self.d_loss_item_rec = []
@@ -282,8 +282,8 @@ class cyclegan(object):
              self.d_loss_sum]
         )
 
-        self.test_A = tf.placeholder(tf.float32,[self.batch_size, self.image_size, self.image_size*2,self.input_c_dim], name='test_A')
-        self.test_B = tf.placeholder(tf.float32,[self.batch_size, self.image_size, self.image_size*2,self.output_c_dim], name='test_B')
+        self.test_A = tf.placeholder(tf.float32,[self.batch_size, self.fine_size_h, self.self.fine_size_w, self.input_c_dim], name='test_A')
+        self.test_B = tf.placeholder(tf.float32,[self.batch_size, self.fine_size_h, self.self.fine_size_w, self.output_c_dim], name='test_B')
 
         self.testB,self.rec_testA,_ = self.generator(self.test_A, self.options, True, name="generatorA2B")
         self.rec_cycle_A,self.refine_testB,_ =self.generator(self.testB, self.options, True, name="generatorB2A")
@@ -368,7 +368,7 @@ class cyclegan(object):
 
             for idx in range(0, batch_idxs):
                 batch_files = list(zip(dataA[idx * self.batch_size:(idx + 1) * self.batch_size],dataB[idx * self.batch_size:(idx + 1) * self.batch_size]))
-                batch_images = [load_train_data(batch_file, args.load_size, args.fine_size) for batch_file in batch_files]
+                batch_images = [load_train_data(batch_file, args.load_size, args.fine_size_w, args.fine_size_h, args.input_nc) for batch_file in batch_files]
                 batch_images = np.array(batch_images).astype(np.float32)
                 # Update G network and record fake outputs
                 fake_A,fake_B,rec_A,rec_B,rec_fake_A,rec_fake_B,_,_,g_loss,gan_loss,g_rec_cycle,g_rec_real,percep,g_adv,g_adv_rec,g_adv_recfake,cls_loss,g_cls_loss,summary_str = self.sess.run(
@@ -417,7 +417,7 @@ class cyclegan(object):
 
     def save(self, checkpoint_dir, step):
         model_name = "cyclegan.model"
-        model_dir = "%s_%s" % (self.dataset_dir, self.image_size)
+        model_dir = "%s_%s" % (self.dataset_dir, self.fine_size_w, self.fine_size_h)
         checkpoint_dir = os.path.join(checkpoint_dir, model_dir)
 
         if not os.path.exists(checkpoint_dir):
@@ -430,7 +430,7 @@ class cyclegan(object):
     def load(self, checkpoint_dir):
         print(" [*] Reading checkpoint...")
 
-        model_dir = "%s_%s" % (self.dataset_dir, self.image_size)
+        model_dir = "%s_%s" % (self.dataset_dir, self.fine_size_w, self.fine_size_h)
         checkpoint_dir = os.path.join(checkpoint_dir, model_dir)
 
         ckpt = tf.train.get_checkpoint_state(checkpoint_dir)
@@ -447,7 +447,7 @@ class cyclegan(object):
         np.random.shuffle(dataA)
         np.random.shuffle(dataB)
         batch_files = list(zip(dataA[:self.batch_size], dataB[:self.batch_size]))
-        sample_images = [load_train_data(batch_file,self.load_size,self.fine_size, is_testing=True) for batch_file in batch_files]
+        sample_images = [load_train_data(batch_file, args.load_size, args.fine_size_w, args.fine_size_h, args.input_nc, is_testing=True) for batch_file in batch_files]
         sample_images = np.array(sample_images).astype(np.float32)
 
         fake_A, fake_B,rec_cycle_A,rec_cycle_B,rec_A,rec_B,rec_fakeA,rec_fakeB = self.sess.run(
