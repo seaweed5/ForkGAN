@@ -2,6 +2,7 @@ import tensorflow as tf
 import tensorflow.contrib.slim as slim
 import math
 import pprint
+from demod import conv2ddemod
 pp = pprint.PrettyPrinter()
 get_stddev = lambda x, k_h, k_w: 1/math.sqrt(k_w*k_h*x.get_shape()[-1])
 import tensorflow.contrib as tf_contrib
@@ -16,7 +17,10 @@ def batch_norm(x, name="batch_norm"):
     return tf.contrib.layers.batch_norm(x, decay=0.9, updates_collections=None, epsilon=1e-5, scale=True, scope=name)
 
 
-def instance_norm(input, name="instance_norm"):
+def instance_norm(input, name="instance_norm", use_demod=False):
+    if use_demod:
+        return input
+
     with tf.variable_scope(name):
         depth = input.get_shape()[3]
         scale = tf.get_variable("scale", [depth], initializer=tf.random_normal_initializer(1.0, 0.02, dtype=tf.float32))
@@ -28,25 +32,34 @@ def instance_norm(input, name="instance_norm"):
         return scale * normalized + offset
 
 
-def conv2d(input_, output_dim, ks=4, s=2, stddev=0.02, padding='SAME', name="conv2d"):
+def conv2d(input_, output_dim, ks=4, s=2, stddev=0.02, padding='SAME', name="conv2d", use_demod=False):
     with tf.variable_scope(name):
-        return slim.conv2d(input_, output_dim, ks, s, padding=padding, activation_fn=None,
-                           weights_initializer=tf.truncated_normal_initializer(stddev=stddev),
-                           biases_initializer=None)
+        if use_demod:
+            return conv2ddemod(input_, output_dim, ks, s, padding=padding, activation_fn=None,
+                            weights_initializer=tf.truncated_normal_initializer(stddev=stddev),
+                            biases_initializer=None)
+        else:
+            return slim.conv2d(input_, output_dim, ks, s, padding=padding, activation_fn=None,
+                            weights_initializer=tf.truncated_normal_initializer(stddev=stddev),
+                            biases_initializer=None)
 
 
-def deconv2d(input_, output_dim, ks=4, s=2, stddev=0.02, name="deconv2d", use_upsampling=False):
+def deconv2d(input_, output_dim, ks=4, s=2, stddev=0.02, name="deconv2d", use_upsampling=False, use_demod=False):
     # From: https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix/blob/master/docs/qa.md 
     with tf.variable_scope(name):
         if use_upsampling:
             batch, in_height, in_width, in_channels = [int(d) for d in input_.get_shape()]
             x = tf.image.resize_nearest_neighbor(input_, (2*in_height,2*in_width))
-            print(input_.get_shape(), x.get_shape())
+
             x = tf.pad(x, [[0, 0], [1, 1], [1, 1], [0, 0]], "REFLECT")
-            x = slim.conv2d(x, output_dim, ks, 1, padding="VALID", activation_fn=None,
-                           weights_initializer=tf.truncated_normal_initializer(stddev=stddev),
-                           biases_initializer=None)
-            print(x.get_shape())
+            if use_demod:
+                x = conv2ddemod(x, output_dim, ks, 1, padding="VALID", activation_fn=None,
+                            weights_initializer=tf.truncated_normal_initializer(stddev=stddev),
+                            biases_initializer=None)
+            else:
+                x = slim.conv2d(x, output_dim, ks, 1, padding="VALID", activation_fn=None,
+                            weights_initializer=tf.truncated_normal_initializer(stddev=stddev),
+                            biases_initializer=None)
             return x
         else:
             return slim.conv2d_transpose(input_, output_dim, ks, s, padding='SAME', activation_fn=None,
@@ -54,14 +67,18 @@ def deconv2d(input_, output_dim, ks=4, s=2, stddev=0.02, name="deconv2d", use_up
                                      biases_initializer=None)
         
 
-def dilated_conv2d(input_, output_dim, ks=3, s=2, stddev=0.02, padding='SAME', name="conv2d"):
+def dilated_conv2d(input_, output_dim, ks=3, s=2, stddev=0.02, padding='SAME', name="conv2d", use_demod=False):
     with tf.variable_scope(name):
-        batch, in_height, in_width, in_channels = [int(d) for d in input_.get_shape()]
-        filter = tf.get_variable("filter", [ks, ks, in_channels, output_dim], dtype=tf.float32,
-                                 initializer=tf.random_normal_initializer(0, stddev))
-        conv = tf.nn.atrous_conv2d(input_,filter,rate=s,padding=padding,name=name)
-
-        return conv
+        if use_demod:
+            return conv2ddemod(input_, output_dim, ks, rate=s, padding=padding, activation_fn=None,
+                               weights_initializer=tf.truncated_normal_initializer(0, stddev=stddev),
+                               biases_initializer=None)
+        else:
+            batch, in_height, in_width, in_channels = [int(d) for d in input_.get_shape()]
+            filter = tf.get_variable("filter", [ks, ks, in_channels, output_dim], dtype=tf.float32,
+                                     initializer=tf.random_normal_initializer(0, stddev))
+            conv = tf.nn.atrous_conv2d(input_,filter,rate=s,padding=padding,name=name)
+            return conv
 
 
 
