@@ -369,7 +369,7 @@ class cyclegan(object):
 
             for idx in range(0, batch_idxs):
                 batch_files = list(zip(dataA[idx * self.batch_size:(idx + 1) * self.batch_size],dataB[idx * self.batch_size:(idx + 1) * self.batch_size]))
-                batch_images = [load_train_data(batch_file, self.load_size, self.fine_size_w, self.fine_size_h, self.input_c_dim) for batch_file in batch_files]
+                batch_images = [load_train_data(batch_file, self.load_size, self.fine_size_w, self.fine_size_h, self.input_c_dim, self.output_c_dim) for batch_file in batch_files]
                 batch_images = np.array(batch_images).astype(np.float32)
                 # Update G network and record fake outputs
                 fake_A,fake_B,rec_A,rec_B,rec_fake_A,rec_fake_B,_,_,g_loss,gan_loss,g_rec_cycle,g_rec_real,percep,g_adv,g_adv_rec,g_adv_recfake,cls_loss,g_cls_loss,summary_str = self.sess.run(
@@ -448,15 +448,16 @@ class cyclegan(object):
         np.random.shuffle(dataA)
         np.random.shuffle(dataB)
         batch_files = list(zip(dataA[:self.batch_size], dataB[:self.batch_size]))
-        sample_images = [load_train_data(batch_file, self.load_size, self.fine_size_w, self.fine_size_h, self.input_c_dim, is_testing=True) for batch_file in batch_files]
+        sample_images = [load_train_data(batch_file, self.load_size, self.fine_size_w, self.fine_size_h, self.input_c_dim, self.output_c_dim, is_testing=True) for batch_file in batch_files]
         sample_images = np.array(sample_images).astype(np.float32)
 
         fake_A, fake_B,rec_cycle_A,rec_cycle_B,rec_A,rec_B,rec_fakeA,rec_fakeB = self.sess.run(
             [self.fake_A, self.fake_B,self.fake_A_,self.fake_B_,self.rec_realA,self.rec_realB,self.rec_fakeA,self.rec_fakeB],
             feed_dict={self.real_data: sample_images}
         )
-        real_A = sample_images[:, :, :, :3]
-        real_B = sample_images[:, :, :, 3:]
+        real_A = sample_images[:, :, :, :self.input_c_dim]
+        real_B = sample_images[:, :, :, self.input_c_dim:]
+        #print(real_B.shape, fake_A.shape, rec_B.shape, rec_fakeA.shape, rec_cycle_B.shape)
 
         merge_A = np.concatenate([real_B, fake_A,rec_B,rec_fakeA,rec_cycle_B], axis=2)
         merge_B = np.concatenate([real_A, fake_B,rec_A,rec_fakeB,rec_cycle_A], axis=2)

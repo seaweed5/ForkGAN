@@ -38,25 +38,26 @@ def check_folder(path):
     if not os.path.exists(path):
         os.mkdir(path)
         
-def scale_shorter(pil_img, size, input_nc):
+def scale_shorter(pil_img, size, dim):
     w, h = pil_img.size
     s = size/h
     h = size
     w = int(s * w)
     img = np.array(pil_img.resize((w, h)))
-    img = img.reshape(h, w, input_nc)
+    img = img.reshape(h, w, dim)
     return img, w, h
 
-def load_train_data(image_path, load_size=286, fine_size_w=256, fine_size_h=256, input_nc=3, is_testing=False):
+def load_train_data(image_path, load_size=286, fine_size_w=256, fine_size_h=256, input_nc=3, output_nc=3, is_testing=False):
     img_A = Image.open(image_path[0]).convert('RGB')
     img_B = Image.open(image_path[1]).convert('RGB')
     if input_nc == 1:
         img_A = img_A.convert('L')
+    if output_nc == 1:
         img_B = img_B.convert('L')
 
     if not is_testing:
         img_A, w_a, h_a = scale_shorter(img_A, load_size, input_nc)
-        img_B, w_b, h_b = scale_shorter(img_B, load_size, input_nc)
+        img_B, w_b, h_b = scale_shorter(img_B, load_size, output_nc)
         h_a = int(np.ceil(np.random.uniform(0, h_a-fine_size_h)))
         w_a = int(np.ceil(np.random.uniform(0, w_a-fine_size_w)))
         h_b = int(np.ceil(np.random.uniform(0, h_b-fine_size_h)))
@@ -69,7 +70,7 @@ def load_train_data(image_path, load_size=286, fine_size_w=256, fine_size_h=256,
             img_B = np.fliplr(img_B)
     else:
         img_A, w_a, h_a = scale_shorter(img_A, fine_size_h, input_nc) # Alert! Hard-coded
-        img_B, w_b, h_b = scale_shorter(img_B, fine_size_h, input_nc)
+        img_B, w_b, h_b = scale_shorter(img_B, fine_size_h, output_nc)
         h_a = int(np.ceil(np.random.uniform(0, h_a-fine_size_h)))
         w_a = int(np.ceil(np.random.uniform(0, w_a-fine_size_w)))
         h_b = int(np.ceil(np.random.uniform(0, h_b-fine_size_h)))

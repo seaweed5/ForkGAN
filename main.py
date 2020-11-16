@@ -1,6 +1,6 @@
 import argparse
-import tensorflow as tf
 import os
+import tensorflow as tf
 from model import cyclegan
 from ops import *
 parser = argparse.ArgumentParser(description='')
@@ -34,11 +34,12 @@ parser.add_argument('--use_resnet', dest='use_resnet', type=bool, default=True,h
 parser.add_argument('--use_lsgan', dest='use_lsgan', type=bool, default=True, help='gan loss defined in lsgan')
 parser.add_argument('--max_size', dest='max_size', type=int, default=50,help='max size of image pool, 0 means do not use image pool')
 
-parser.add_argument('--use_upsampling', dest='use_upsampling', type=bool, default=False, help='use upsampling+conv instead of transposed convolution')
-parser.add_argument('--use_demod', dest='use_demod', type=bool, default=False, help='use StyleGAN2 demod layer instead of instance normalization')
+parser.add_argument('--use_upsampling', dest='use_upsampling', action='store_true', help='use upsampling+conv instead of transposed convolution')
+parser.add_argument('--use_demod', dest='use_demod', action='store_true', help='use StyleGAN2 demod layer instead of instance normalization')
 
 args = parser.parse_args()
 os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu)
+
 def main(_):
     if not os.path.exists(args.checkpoint_dir):
         os.makedirs(args.checkpoint_dir)
@@ -54,4 +55,8 @@ def main(_):
         model.train(args) if args.phase == 'train' \
             else model.test(args)
 if __name__ == '__main__':
+    print('============================== ARGUMENTS ==============================')
+    for k, v in vars(args).items():
+        print(k, v)
+    print('=======================================================================')
     tf.app.run()
