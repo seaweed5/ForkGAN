@@ -33,7 +33,7 @@ parser.add_argument('--L1_lambda', dest='L1_lambda', type=float, default=10.0, h
 parser.add_argument('--use_resnet', dest='use_resnet', type=bool, default=True,help='generation network using reidule block')
 parser.add_argument('--use_lsgan', dest='use_lsgan', type=bool, default=True, help='gan loss defined in lsgan')
 parser.add_argument('--max_size', dest='max_size', type=int, default=50,help='max size of image pool, 0 means do not use image pool')
-parser.add_argument('--use_upsampling', dest='use_upsampling', type=bool, default=False, help'use nn-upsampling+conv instead of transposed convolution')
+parser.add_argument('--use_upsampling', dest='use_upsampling', type=bool, default=False, help='use upsampling+conv instead of transposed convolution')
 
 args = parser.parse_args()
 os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu)

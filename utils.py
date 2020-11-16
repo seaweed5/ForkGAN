@@ -2,6 +2,8 @@ import scipy.misc
 import numpy as np
 import copy
 import os
+from PIL import Image
+
 class ImagePool(object):
     def __init__(self, maxsize=50):
         self.maxsize = maxsize
@@ -53,8 +55,8 @@ def load_train_data(image_path, load_size=286, fine_size_w=256, fine_size_h=256,
         img_B = img_B.convert('L')
 
     if not is_testing:
-        img_A, w_a, h_a = scale_shorter(img_A, load_size)
-        img_B, w_b, h_b = scale_shorter(img_B, load_size)
+        img_A, w_a, h_a = scale_shorter(img_A, load_size, input_nc)
+        img_B, w_b, h_b = scale_shorter(img_B, load_size, input_nc)
         h_a = int(np.ceil(np.random.uniform(0, h_a-fine_size_h)))
         w_a = int(np.ceil(np.random.uniform(0, w_a-fine_size_w)))
         h_b = int(np.ceil(np.random.uniform(0, h_b-fine_size_h)))
@@ -66,8 +68,8 @@ def load_train_data(image_path, load_size=286, fine_size_w=256, fine_size_h=256,
             img_A = np.fliplr(img_A)
             img_B = np.fliplr(img_B)
     else:
-        img_A, w_a, h_a = scale_shorter(img_A, fine_size_h) # Alert! Hard-coded
-        img_B, w_b, h_b = scale_shorter(img_B, fine_size_h)
+        img_A, w_a, h_a = scale_shorter(img_A, fine_size_h, input_nc) # Alert! Hard-coded
+        img_B, w_b, h_b = scale_shorter(img_B, fine_size_h, input_nc)
         h_a = int(np.ceil(np.random.uniform(0, h_a-fine_size_h)))
         w_a = int(np.ceil(np.random.uniform(0, w_a-fine_size_w)))
         h_b = int(np.ceil(np.random.uniform(0, h_b-fine_size_h)))

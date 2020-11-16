@@ -8,6 +8,10 @@ import tensorflow.contrib as tf_contrib
 weight_init = tf_contrib.layers.xavier_initializer()
 weight_regularizer = None
 
+def compute_output_shape(self, input_shape):
+    return input_shape[:-1] + (self.filters,)
+
+
 def batch_norm(x, name="batch_norm"):
     return tf.contrib.layers.batch_norm(x, decay=0.9, updates_collections=None, epsilon=1e-5, scale=True, scope=name)
 
@@ -36,11 +40,13 @@ def deconv2d(input_, output_dim, ks=4, s=2, stddev=0.02, name="deconv2d", use_up
     with tf.variable_scope(name):
         if use_upsampling:
             batch, in_height, in_width, in_channels = [int(d) for d in input_.get_shape()]
-            x = tf.image.resize_nearest_neighbor(x, (2*in_height,2*in_width))
+            x = tf.image.resize_nearest_neighbor(input_, (2*in_height,2*in_width))
+            print(input_.get_shape(), x.get_shape())
             x = tf.pad(x, [[0, 0], [1, 1], [1, 1], [0, 0]], "REFLECT")
-            x = slim.conv2d(input_, output_dim, ks, 1, padding="VALID", activation_fn=None,
+            x = slim.conv2d(x, output_dim, ks, 1, padding="VALID", activation_fn=None,
                            weights_initializer=tf.truncated_normal_initializer(stddev=stddev),
                            biases_initializer=None)
+            print(x.get_shape())
             return x
         else:
             return slim.conv2d_transpose(input_, output_dim, ks, s, padding='SAME', activation_fn=None,
