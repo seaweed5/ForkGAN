@@ -36,6 +36,7 @@ parser.add_argument('--max_size', dest='max_size', type=int, default=50,help='ma
 
 parser.add_argument('--use_upsampling', dest='use_upsampling', action='store_true', help='use upsampling+conv instead of transposed convolution')
 parser.add_argument('--use_demod', dest='use_demod', action='store_true', help='use StyleGAN2 demod layer instead of instance normalization')
+parser.add_argument('--use_lrelu', dest='use_lrelu', action='store_true', help='use LRELU instead of RELU in generator layers')
 
 args = parser.parse_args()
 os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu)

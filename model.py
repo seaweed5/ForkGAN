@@ -16,15 +16,15 @@ def generator_resnet(image, options, reuse=False, name="generator"):
             assert tf.get_variable_scope().reuse is False
         def residule_block_dilated(x, dim, ks=3, s=1, name='res'):
             y = instance_norm(dilated_conv2d(x, dim, ks, s, padding='SAME', name=name + '_c1', use_demod=options.use_demod), name + '_bn1', use_demod=options.use_demod)
-            y = tf.nn.relu(y)
+            y = relu(y, use_lrelu=options.use_lrelu)
             y = instance_norm(dilated_conv2d(y, dim, ks, s, padding='SAME', name=name + '_c2', use_demod=options.use_demod), name + '_bn2', use_demod=options.use_demod)
             return y + x
 
         ### Encoder architecture
         c0 = tf.pad(image, [[0, 0], [3, 3], [3, 3], [0, 0]], "REFLECT")
-        c1 = tf.nn.relu(instance_norm(conv2d(c0, options.gf_dim, 7, 1, padding='VALID', name='g_e1_c', use_demod=options.use_demod), 'g_e1_bn', use_demod=options.use_demod))
-        c2 = tf.nn.relu(instance_norm(conv2d(c1, options.gf_dim * 2, 3, 2, name='g_e2_c', use_demod=options.use_demod), 'g_e2_bn', use_demod=options.use_demod))
-        c3 = tf.nn.relu(instance_norm(conv2d(c2, options.gf_dim * 4, 3, 2, name='g_e3_c', use_demod=options.use_demod), 'g_e3_bn', use_demod=options.use_demod))
+        c1 = relu(instance_norm(conv2d(c0, options.gf_dim, 7, 1, padding='VALID', name='g_e1_c', use_demod=options.use_demod), 'g_e1_bn', use_demod=options.use_demod), use_lrelu=options.use_lrelu)
+        c2 = relu(instance_norm(conv2d(c1, options.gf_dim * 2, 3, 2, name='g_e2_c', use_demod=options.use_demod), 'g_e2_bn', use_demod=options.use_demod), use_lrelu=options.use_lrelu)
+        c3 = relu(instance_norm(conv2d(c2, options.gf_dim * 4, 3, 2, name='g_e3_c', use_demod=options.use_demod), 'g_e3_bn', use_demod=options.use_demod), use_lrelu=options.use_lrelu)
         r1 = residule_block_dilated(c3, options.gf_dim * 4, name='g_r1')
         r2 = residule_block_dilated(r1, options.gf_dim * 4, name='g_r2')
         r3 = residule_block_dilated(r2, options.gf_dim * 4, name='g_r3')
@@ -37,11 +37,12 @@ def generator_resnet(image, options, reuse=False, name="generator"):
         r8 = residule_block_dilated(r7, options.gf_dim * 4, name='g_r8')
         r9 = residule_block_dilated(r8, options.gf_dim * 4, name='g_r9')
         d1 = deconv2d(r9, options.gf_dim * 2, 3, 2, name='g_d1_dc', use_upsampling=options.use_upsampling, use_demod=options.use_demod)
-        d1 = tf.nn.relu(instance_norm(d1, 'g_d1_bn', use_demod=options.use_demod))
+        d1 = relu(instance_norm(d1, 'g_d1_bn', use_demod=options.use_demod), use_lrelu=options.use_lrelu)
         d2 = deconv2d(d1, options.gf_dim, 3, 2, name='g_d2_dc', use_upsampling=options.use_upsampling, use_demod=options.use_demod)
-        d2 = tf.nn.relu(instance_norm(d2, 'g_d2_bn', use_demod=options.use_demod))
+        #d2 = relu(instance_norm(d2, 'g_d2_bn', use_demod=options.use_demod), use_lrelu=options.use_lrelu)
+        d2 = relu(instance_norm(d2, 'g_d2_bn', use_demod=False), use_lrelu=options.use_lrelu)
         d2 = tf.pad(d2, [[0, 0], [3, 3], [3, 3], [0, 0]], "REFLECT")
-        pred = tf.nn.tanh(conv2d(d2, options.output_c_dim, 7, 1, padding='VALID', name='g_pred_c'))
+        pred = tf.nn.tanh(conv2d(d2, options.output_c_dim, 7, 1, padding='VALID', name='g_pred_c', use_demod=False))
 
         ### reconstruction decoder architecture
         r5 = gaussian_noise_layer(r5, 0.02)
@@ -51,11 +52,12 @@ def generator_resnet(image, options, reuse=False, name="generator"):
         r8_rec = residule_block_dilated(r7_rec, options.gf_dim * 4, name='g_r8_rec')
         r9_rec = residule_block_dilated(r8_rec, options.gf_dim * 4, name='g_r9_rec')
         d1_rec = deconv2d(r9_rec, options.gf_dim * 2, 3, 2, name='g_d1_dc_rec', use_upsampling=options.use_upsampling, use_demod=options.use_demod)
-        d1_rec = tf.nn.relu(instance_norm(d1_rec, 'g_d1_bn_rec', use_demod=options.use_demod))
+        d1_rec = relu(instance_norm(d1_rec, 'g_d1_bn_rec', use_demod=options.use_demod), use_lrelu=options.use_lrelu)
         d2_rec = deconv2d(d1_rec, options.gf_dim, 3, 2, name='g_d2_dc_rec', use_upsampling=options.use_upsampling, use_demod=options.use_demod)
-        d2_rec = tf.nn.relu(instance_norm(d2_rec, 'g_d2_bn_rec', use_demod=options.use_demod))
+        #d2_rec = relu(instance_norm(d2_rec, 'g_d2_bn_rec', use_demod=options.use_demod), use_lrelu=options.use_lrelu)
+        d2_rec = relu(instance_norm(d2_rec, 'g_d2_bn_rec', use_demod=False), use_lrelu=options.use_lrelu)
         d2_rec = tf.pad(d2_rec, [[0, 0], [3, 3], [3, 3], [0, 0]], "REFLECT")
-        pred_rec = tf.nn.tanh(conv2d(d2_rec, options.output_c_dim, 7, 1, padding='VALID', name='g_pred_c_rec'))
+        pred_rec = tf.nn.tanh(conv2d(d2_rec, options.output_c_dim, 7, 1, padding='VALID', name='g_pred_c_rec', use_demod=False))
         return pred,pred_rec,r5
 
 def domain_agnostic_classifier(percep,options, reuse=False,name="percep"):
@@ -67,7 +69,7 @@ def domain_agnostic_classifier(percep,options, reuse=False,name="percep"):
         h1 = lrelu(instance_norm(conv2d(percep, options.df_dim * 4, name='d_h1_conv', use_demod=options.use_demod), 'd_bn1', use_demod=options.use_demod))
         h2 = lrelu(instance_norm(conv2d(h1, options.df_dim * 2, name='d_h2_conv', use_demod=options.use_demod), 'd_bn2', use_demod=options.use_demod))
         h3 = lrelu(instance_norm(conv2d(h2, options.df_dim * 2, name='d_h3_conv', use_demod=options.use_demod), 'd_bn3', use_demod=options.use_demod))
-        h4 = conv2d(h3, 2, s=1, name='d_h3_pred', use_demod=options.use_demod)
+        h4 = conv2d(h3, 2, s=1, name='d_h3_pred', use_demod=False)
         return tf.reshape(tf.reduce_mean(h4,axis=[0,1,2]),[-1,1,1,2])
 
 def abs_criterion(in_, target):
@@ -122,10 +124,10 @@ class cyclegan(object):
             self.criterionGAN_list = sce_criterion_list
 
         OPTIONS = namedtuple('OPTIONS', 'batch_size fine_size_w fine_size_h \
-                              gf_dim df_dim output_c_dim is_training use_upsampling use_demod')
+                              gf_dim df_dim output_c_dim is_training use_upsampling use_demod use_lrelu')
         self.options = OPTIONS._make((args.batch_size, args.fine_size_w, args.fine_size_h,
                                       args.ngf, args.ndf//args.n_d, args.output_nc,
-                                      args.phase == 'train', args.use_upsampling, args.use_demod))
+                                      args.phase == 'train', args.use_upsampling, args.use_demod, args.use_lrelu))
 
         self._build_model()
         self.saver = tf.train.Saver()

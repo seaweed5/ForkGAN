@@ -132,6 +132,15 @@ def final_conv(images,n_scale,name):
 def lrelu(x, leak=0.2, name="lrelu"):
     return tf.maximum(x, leak * x)
 
+def relu(x, leak=0.2, use_lrelu=False):
+    if use_lrelu:
+        return tf.nn.relu(x)
+        name = 'lrelu'
+    else:
+        return tf.maximum(x, leak * x)
+        name = 'relu'
+
+
 
 def linear(input_, output_size, scope=None, stddev=0.02, bias_start=0.0, with_w=False):
     with tf.variable_scope(scope or "Linear"):
